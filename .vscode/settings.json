@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.inc": "serpent",
+        "memory": "cpp"
+    }
+}
