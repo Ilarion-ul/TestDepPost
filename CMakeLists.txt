@@ -22,6 +22,10 @@ add_library(serpent_core
 target_link_libraries(serpent_core PUBLIC spdlog::spdlog_header_only)
 target_include_directories(serpent_core PUBLIC src)
 
+# ---------- бібліотека gui ----------------------------------
+add_subdirectory(gui)
+
+
 # ---------- консольний приклад -------------------------------
 add_executable(SerpentPostCli src/main.cpp)
 target_link_libraries(SerpentPostCli PRIVATE serpent_core)
