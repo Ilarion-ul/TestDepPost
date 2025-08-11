@@ -529,6 +529,7 @@ Thumbs.db
 # Outputs
 out_*/
 *.csv
+.m
 
 # Temporary
 *.cache/
