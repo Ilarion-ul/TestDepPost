@@ -497,6 +497,39 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# Build/IDE
+build/
+_deps/
+.vs/
+.vscode/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+*.vcxproj.user
+
+# Binaries/obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.log
+*.tlog
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs
+out_*/
+*.csv
+
+# Temporary
+*.cache/
+
+
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 
