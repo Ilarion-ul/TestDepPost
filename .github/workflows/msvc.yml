@@ -1,0 +1,42 @@
+name: Build (MSVC)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake, VS 2022, x64)
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -- -m
+
+      - name: Smoke test CLI on sample dep.m
+        shell: pwsh
+        run: |
+          $exe = "build/Release/SerpentPostCli.exe"
+          if (-not (Test-Path $exe)) { throw "CLI not found: $exe" }
+          New-Item -ItemType Directory -Force -Path ci_out | Out-Null
+          # візьмемо один з депів у репо; за потреби поміняй ім'я
+          .\build\Release\SerpentPostCli.exe "FeCrAl_burnup_FA_dep.m" "ci_out"
+          Get-ChildItem ci_out
+
+      - name: Upload artifacts (CSV)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: csv-out
+          path: ci_out
+          if-no-files-found: warn
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SerpentPostCli-Release
+          path: build/Release/SerpentPostCli.exe
+          if-no-files-found: error
