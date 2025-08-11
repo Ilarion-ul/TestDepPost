@@ -3,22 +3,23 @@
 #include "Logger.h"
 #include <iostream>
 
-int main(int argc,char* argv[])
+int main(int argc, char* argv[])
 {
-    if(argc<3){
-        std::cerr<<"Usage: "<<argv[0]<<" <dep.m> <out.csv>\n"; return 1;
-    }
-    log::Logger::init(log::Level::Info);
+    if (argc < 3) { std::cerr << "Usage: " << argv[0] << " <dep.m> <outDir>\n"; return 1; }
 
-    try{
-        DepParser p; p.parseFile(argv[1]);
-        CsvWriter::write(p.getData(),argv[2]);
+    slog::Logger::init(slog::Level::Info);
 
-        std::cout<<"Done. Steps: "<<p.getData().steps.size()
-                 <<", isotopes: "<<p.getData().ZAI.size()<<'\n';
-    }catch(const std::exception& ex){
-        log::Logger::error("Fatal: {}",ex.what());
-        std::cerr<<"Error: "<<ex.what()<<'\n'; return 2;
+    try {
+        DepParser parser;  parser.parseFile(argv[1]);
+
+        std::filesystem::path outDir = argv[2];
+        CsvWriter::writePerMaterial(parser.getData(), outDir);
+
+        std::cout << "Done. Steps: " << parser.getData().steps.size()
+                  << ", isotopes: " << parser.getData().ZAI.size() << '\n';
     }
-    return 0;
+    catch (const std::exception& ex) {
+        slog::Logger::error("Fatal: {}", ex.what());
+        std::cerr << ex.what() << '\n';  return 2;
+    }
 }

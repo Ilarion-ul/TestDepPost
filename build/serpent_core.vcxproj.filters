@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\DepParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\CsvWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\Logger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\DepParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\src\CsvWriter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="A:\Work\SSTC\Schol\Project\C++\SerpentPost\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{2A620439-9F73-35E0-B17B-C4647557EFEB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{049BADC4-8732-3E92-92A1-CDB73468A1FC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

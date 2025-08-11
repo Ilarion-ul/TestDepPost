@@ -3,13 +3,12 @@
 
 #include <fstream>
 #include <regex>
-#include <sstream>
 #include <stdexcept>
 #include <cctype>
 
 using Row = std::vector<double>;
 
-/* ===== Утиліта: числа у форматах 1.23E-04, 3.0, -7 ===== */
+/* ===== Утиліта: витяг усіх чисел з рядка (1.23E-04, 3.0, -7, …) ===== */
 std::vector<double> DepParser::parseNumbersLine(const std::string& line)
 {
     static const std::regex num(R"(([+-]?(?:\d+\.\d*|\d*\.?\d+)(?:[Ee][+-]?\d+)?))");
@@ -19,7 +18,7 @@ std::vector<double> DepParser::parseNumbersLine(const std::string& line)
     return out;
 }
 
-/* ===== Запис матриці покроково (col = idx) ============= */
+/* ===== Перекладання матриці рядків у колонки по step (col = idx) ===== */
 void DepParser::storeMatrix(const std::string& material,
                             const std::string& param,
                             const std::vector<std::vector<double>>& rows)
@@ -36,7 +35,7 @@ void DepParser::storeMatrix(const std::string& material,
     }
 }
 
-/* ======== Головний парсер =========================================== */
+/* ============================= Головний парсер ============================== */
 void DepParser::parseFile(const std::string& filename)
 {
     std::ifstream in(filename);
@@ -48,9 +47,12 @@ void DepParser::parseFile(const std::string& filename)
     /* --- основні регекспи --- */
     const std::regex reZai  (R"(^\s*ZAI\s*=)");
     const std::regex reNames(R"(^\s*NAMES\s*=)");
-    const std::regex reMat  (R"(^\s*MAT_([A-Za-z0-9_]+)_([A-Z0-9_]+)\s*\(.*=\s*\[)");
-    const std::regex reTot  (R"(^\s*TOT_([A-Z0-9_]+)\s*\(.*=\s*\[)");
-    const std::regex reIdx  (R"(^\s*idx\s*=)");          /* просто пропускаємо */
+    const std::regex reIdx  (R"(^\s*idx\s*=)");
+    const std::regex reBU   (R"(^\s*BU\s*=\s*\[)");
+    const std::regex reDAYS (R"(^\s*DAYS\s*=\s*\[)");
+    // Параметри матеріалів/тоталів (підтримуємо MDENS і MASS)
+    const std::regex reMat(R"(^\s*MAT_([A-Za-z0-9_]+)_(ADENS|MDENS|MASS|A|H|SF|GSRC|ING_TOX|INH_TOX|VOLUME|BURNUP)\s*(?:\([^)]*\))?\s*=\s*\[)");
+    const std::regex reTot(R"(^\s*TOT_(ADENS|MDENS|MASS|A|H|SF|GSRC|ING_TOX|INH_TOX|VOLUME|BURNUP)\s*(?:\([^)]*\))?\s*=\s*\[)");
 
     bool zaiSeen   = false;
     bool namesSeen = false;
@@ -58,7 +60,55 @@ void DepParser::parseFile(const std::string& filename)
     /* ------------------ основний цикл по рядках ---------------------- */
     while (std::getline(in, line))
     {
-        if (line.empty() || line[0]=='%') continue;      // коментар
+        if (line.empty() || line[0]=='%') continue;      // пропустити коментар/порожній
+
+        /* ---- BU / DAYS (одновимірні вектори по step) ---------------- */
+        if (std::regex_search(line, reBU) || std::regex_search(line, reDAYS)) {
+            std::string firstLine = line;
+            std::vector<double> vals;
+
+            // знайти початковий '['
+            std::string arrLine = firstLine;
+            if (arrLine.find('[') == std::string::npos)
+                while (std::getline(in, arrLine) && arrLine.find('[') == std::string::npos) {}
+
+            auto pos = arrLine.find('[');
+            std::string tail = arrLine.substr(pos + 1);
+            bool closedSameLine = false;
+            if (auto rb = tail.find(']'); rb != std::string::npos) {
+                closedSameLine = true;
+                tail.erase(rb);
+            }
+            if (auto r = parseNumbersLine(tail); !r.empty())
+                vals.insert(vals.end(), r.begin(), r.end());
+
+            while (!closedSameLine && std::getline(in, line)) {
+                auto rb = line.find(']');
+                if (rb != std::string::npos) {
+                    std::string before = line.substr(0, rb);
+                    if (auto r = parseNumbersLine(before); !r.empty())
+                        vals.insert(vals.end(), r.begin(), r.end());
+                    break;
+                }
+                if (auto cpos = line.find('%'); cpos != std::string::npos) line.erase(cpos);
+                if (auto r = parseNumbersLine(line); !r.empty())
+                    vals.insert(vals.end(), r.begin(), r.end());
+            }
+
+            // зберегти у BU / DAYS
+            if (std::regex_search(firstLine, reBU) || std::regex_search(arrLine, reBU))
+                data_.BU = std::move(vals);
+            else
+                data_.DAYS = std::move(vals);
+
+            // узгодити довжину з кількістю колонок матриць
+            const size_t k = !data_.BU.empty() ? data_.BU.size() : data_.DAYS.size();
+            if (!nSteps_) nSteps_ = k;
+            else if (k && nSteps_ && k != nSteps_)
+                slog::Logger::warn("BU/DAYS length {} differs from matrix columns {}", k, nSteps_);
+            continue;
+        }
+
         /* ---- ZAI ---------------------------------------------------- */
         if (std::regex_search(line, reZai))
         {
@@ -100,34 +150,39 @@ void DepParser::parseFile(const std::string& filename)
         else if (std::regex_search(line, m, reTot)) { material = "TOT"; param = m[1]; }
         else continue;
 
-        /* ---- шукаємо символ '[' (може бути на цьому рядку) --------- */
+        /* ---- знайти '[' (може бути не на цьому рядку) --------------- */
         std::string arrLine = line;
         if (arrLine.find('[')==std::string::npos)
             while (std::getline(in,arrLine) && arrLine.find('[')==std::string::npos){}
 
-        /* ---- читаємо до відповідного ']' --------------------------- */
+        /* ---- прочитати до відповідного ']' -------------------------- */
         std::vector<Row> rows;
-        auto pos = arrLine.find('[');
-        std::string tail = arrLine.substr(pos+1);
-        if (tail.find(']')!=std::string::npos)
-            tail.erase(tail.find(']'));          // усе після ']' не потрібне
-        if (auto r = parseNumbersLine(tail); !r.empty()) rows.push_back(std::move(r));
+        auto apos = arrLine.find('[');
+        std::string tail = arrLine.substr(apos + 1);
+        bool closedSameLine = false;
+        if (auto rb = tail.find(']'); rb != std::string::npos) {
+            closedSameLine = true;
+            tail.erase(rb);
+        }
+        if (auto r = parseNumbersLine(tail); !r.empty())
+            rows.push_back(std::move(r));
 
-        while (std::getline(in,line))
-        {
-            if (line.find(']')!=std::string::npos) {
-                std::string before = line.substr(0, line.find(']'));
-                if (auto r = parseNumbersLine(before); !r.empty()) rows.push_back(std::move(r));
+        while (!closedSameLine && std::getline(in, line)) {
+            auto rb = line.find(']');
+            if (rb != std::string::npos) {
+                std::string before = line.substr(0, rb);
+                if (auto r = parseNumbersLine(before); !r.empty())
+                    rows.push_back(std::move(r));
                 break;
             }
-            auto comment = line.find('%');
-            if (comment!=std::string::npos) line.erase(comment);
-            if (auto r = parseNumbersLine(line); !r.empty()) rows.push_back(std::move(r));
+            if (auto cpos = line.find('%'); cpos != std::string::npos) line.erase(cpos);
+            if (auto r = parseNumbersLine(line); !r.empty())
+                rows.push_back(std::move(r));
         }
 
-        if (rows.empty()) { log::Logger::warn("Empty {}_{}", material, param); continue; }
+        if (rows.empty()) { slog::Logger::warn("Empty {}_{}", material, param); continue; }
 
-        /* ---- перевірка консистентності ----------------------------- */
+        /* ---- перевірка консистентності ------------------------------ */
         const size_t cols = rows.front().size();
         for (const auto& r: rows)
             if (r.size()!=cols)
@@ -137,19 +192,15 @@ void DepParser::parseFile(const std::string& filename)
         else if (cols!=nSteps_)
             throw std::runtime_error(material+'_'+param+": column count ≠ previous matrices");
 
-        /* ---- isotopic vs scalar validation (не фатальна) ----------- */
+        /* ---- ізотопний vs скалярний (лише попередження) ------------- */
         const size_t expectRows = data_.ZAI.size() + 2;   // +Lost, +Total
         if (rows.size()!=expectRows && rows.size()!=1)
-            log::Logger::warn("{}_{}: rows {} vs expected {}", material, param,
-                              rows.size(), expectRows);
+            slog::Logger::warn("{}_{}: rows {} vs expected {}", material, param, rows.size(), expectRows);
 
+        /* ---- зберегти ----------------------------------------------- */
         storeMatrix(material, param, rows);
     }
 
     if (!zaiSeen || !namesSeen)
-        throw std::runtime_error("Missing ZAI or NAMES in "+filename);
-
-    log::Logger::info("Parsed '{}': steps={}, materials={}",
-                      filename, data_.steps.size(),
-                      data_.steps.begin()->second.size());
+        throw std::runtime_error("Missing ZAI or NAMES in " + filename);
 }

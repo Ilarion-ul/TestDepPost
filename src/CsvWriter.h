@@ -1,10 +1,11 @@
 // src/CsvWriter.h
 #pragma once
 #include "DepParser.h"
+#include <filesystem>
 #include <string>
 
-class CsvWriter{
+class CsvWriter {
 public:
-    /// формує файл: step,material,param,ізотопи...
-    static void write(const DepData& d,const std::string& file);
+    static void writePerMaterial(const DepData& d,
+                                 const std::filesystem::path& outDir);
 };
