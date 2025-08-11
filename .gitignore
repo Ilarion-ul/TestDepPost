@@ -494,6 +494,10 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
+# Windows shell metadata
+desktop.ini
+**/desktop.ini
+
 # JetBrains Rider
 *.sln.iml
 
